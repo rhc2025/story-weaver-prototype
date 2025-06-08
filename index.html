@@ -1,1 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local LLM - Technology Prototype</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f0f2f5;
+            color: #1c1e21;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+            max-width: 700px;
+            width: 100%;
+            text-align: center;
+        }
+        h1 {
+            font-size: 2em;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 12px;
+            border: 1px solid #dddfe2;
+            border-radius: 8px;
+            font-size: 1em;
+            resize: vertical;
+            box-sizing: border-box;
+            margin-bottom: 15px;
+        }
+        button {
+            background-color: #fbbc05;
+            color: #333;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        button:hover {
+            background-color: #f9ab00;
+        }
+        button:disabled {
+            background-color: #fde293;
+            cursor: not-allowed;
+        }
+        #status-container {
+            margin: 20px auto;
+            padding: 15px;
+            background-color: #e8f0fe;
+            border: 1px solid #d2e3fc;
+            border-radius: 8px;
+        }
+        #status-text {
+            font-weight: bold;
+            color: #1967d2;
+        }
+        progress {
+            width: 100%;
+            height: 12px;
+            margin-top: 10px;
+        }
+        #result-container {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f7f8fa;
+            border: 1px solid #dddfe2;
+            border-radius: 8px;
+            text-align: left;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            font-family: 'Georgia', serif;
+        }
+    </style>
+</head>
+<body>
 
+    <div class="container">
+        <h1>Local Story Generator</h1>
+        
+        <div id="status-container">
+            <div id="status-text">Initializing New AI Engine... Please wait.</div>
+            <progress id="progress-bar" value="0" max="100"></progress>
+        </div>
+
+        <textarea id="prompt-input" placeholder="The local AI is loading..." disabled></textarea>
+        
+        <button id="generate-btn" disabled>Generate Story</button>
+        
+        <div id="result-container" style="display: none;"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/llm.js/dist/llm.min.js"></script>
+
+    <script>
+        // 2. Get references to UI elements
+        const statusText = document.getElementById('status-text');
+        const progressBar = document.getElementById('progress-bar');
+        const generateBtn = document.getElementById('generate-btn');
+        const promptInput = document.getElementById('prompt-input');
+        const resultContainer = document.getElementById('result-container');
+
+        // This is a direct link to a very small, compatible model file
+        const modelUrl = "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q2_K.gguf";
+
+        // 3. Main function to set up the new AI engine
+        async function initializeAI() {
+            try {
+                // Initialize the LLM.js library with the model URL
+                const llm = new LLM(modelUrl, {
+                    // This function is called every time download progress is updated
+                    onProgress: (progress) => {
+                        const percentage = (progress.loaded / progress.total) * 100;
+                        statusText.textContent = `Downloading AI Model... (${Math.round(percentage)}%)`;
+                        progressBar.value = percentage;
+                    },
+                });
+
+                // This function is called when the model is loaded and ready
+                llm.onLoad = () => {
+                    statusText.textContent = 'AI Model Ready!';
+                    progressBar.style.display = 'none';
+                    promptInput.disabled = false;
+                    promptInput.placeholder = 'For example: a little star that was afraid of the dark...';
+                    generateBtn.disabled = false;
+                };
+
+                // Attach the generation logic to the button
+                generateBtn.addEventListener('click', async () => {
+                    const prompt = promptInput.value;
+                    if (!prompt) {
+                        alert("Please enter a story idea!");
+                        return;
+                    }
+
+                    generateBtn.disabled = true;
+                    generateBtn.textContent = 'Generating...';
+                    resultContainer.style.display = 'block';
+                    resultContainer.textContent = ''; // Clear previous results
+
+                    // This prompt structure is specific to this model
+                    const fullPrompt = `<|im_start|>user\n${prompt}<|im_end|>\n<|im_start|>assistant\n`;
+
+                    // Generate the story. This model responds in "streams".
+                    await llm.prompt(fullPrompt, {
+                        // This function is called for each piece of the story
+                        onToken: (token) => {
+                            resultContainer.textContent += token;
+                        },
+                        // This function is called when the story is complete
+                        onComplete: () => {
+                            generateBtn.disabled = false;
+                            generateBtn.textContent = 'Generate Story';
+                        }
+                    });
+                });
+
+            } catch (error) {
+                console.error("Critical Error:", error);
+                statusText.textContent = "A critical error occurred. This browser may not be supported.";
+            }
+        }
+
+        // Run the initialization function
+        initializeAI();
+    </script>
+
+</body>
+</html>
